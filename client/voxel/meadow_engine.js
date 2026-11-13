@@ -381,7 +381,7 @@ function createContributorSignboard(maxAniso = 4) {
     ctx.font = "800 30px -apple-system, BlinkMacSystemFont, 'Inter', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("GEMINISLAND", 256, 66);
+    ctx.fillText("ALI ISLAND", 256, 66);
 
     ctx.fillStyle = "#18211b";
     ctx.font = "800 104px -apple-system, BlinkMacSystemFont, 'Inter', sans-serif";
@@ -557,9 +557,10 @@ const SKY_BANNER_GLYPHS = {
 
 function createFloatingSkyBanner() {
   const group = new THREE.Group();
-  const text = "GEMINISLAND";
+  const text = "ALI ISLAND";
   const voxScale = 0.56;
   const letterGapCols = 2.1;
+  const spaceAdvanceCols = 4.2;
 
   // Curated Hollywood-sign-meets-sky-whimsy vertical & depth stagger per letter
   const staggerOffsetsY = [0.72, -0.82, 1.08, -0.56, 0.88, -0.94, 0.66, -0.78, 1.12, -0.58, 0.82];
@@ -570,8 +571,13 @@ function createFloatingSkyBanner() {
   const chars = text.split("");
   let totalCols = 0;
   for (let i = 0; i < chars.length; i++) {
+    if (chars[i] === " ") {
+      totalCols += spaceAdvanceCols;
+      continue;
+    }
     const rows = SKY_BANNER_GLYPHS[chars[i]];
-    totalCols += rows[0].length + (i < chars.length - 1 ? letterGapCols : 0);
+    if (!rows) continue;
+    totalCols += rows[0].length + (i < chars.length - 1 && chars[i + 1] !== " " ? letterGapCols : 0);
   }
 
   const letters = [];
@@ -579,7 +585,12 @@ function createFloatingSkyBanner() {
 
   for (let i = 0; i < chars.length; i++) {
     const ch = chars[i];
+    if (ch === " ") {
+      cursorCol += spaceAdvanceCols;
+      continue;
+    }
     const rows = SKY_BANNER_GLYPHS[ch];
+    if (!rows) continue;
     const hRows = rows.length;
     const wCols = rows[0].length;
     const v = new Vox(1700 + i * 37);
@@ -614,7 +625,7 @@ function createFloatingSkyBanner() {
     holder.add(mesh);
 
     const centerCol = cursorCol + wCols * 0.5;
-    cursorCol += wCols + letterGapCols;
+    cursorCol += wCols + (i < chars.length - 1 && chars[i + 1] !== " " ? letterGapCols : 0);
 
     const u = chars.length > 1 ? (i / (chars.length - 1)) * 2 - 1 : 0;
     const archY = (1 - u * u) * 1.15;
@@ -3837,7 +3848,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
       z: CITY_SIGN_POS[1],
       data: {
         id: "__city_sign__",
-        name: "GeminIsland Sign",
+        name: "Ali Island Sign",
         description: `Timber town signboard displaying ${n} ${n === 1 ? "contribution" : "contributions"} (${total} total builds on the island).`,
         behavior: {
           statusLine: `${n} ${n === 1 ? "contribution" : "contributions"} · ${total} creations`,
