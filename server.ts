@@ -240,6 +240,7 @@ function buildCapacitorConfigJson(opts: {
     webDir: "dist",
     android: {
       allowMixedContent: true,
+      backgroundColor: "#84c960",
     },
   };
   if (opts.serverUrl && /^https?:\/\/.+/.test(opts.serverUrl)) {
@@ -630,6 +631,10 @@ export async function startServer(customPort?: number) {
         for (const file of files) {
           zip.file(file.relPath, file.content);
         }
+        if (!seen.has("public/offline_world.json")) {
+          const snapshot = worldStore.getWorldSnapshot("", "");
+          zip.file("public/offline_world.json", JSON.stringify(snapshot));
+        }
         if (!seen.has("capacitor.config.json")) {
           zip.file(
             "capacitor.config.json",
@@ -780,11 +785,16 @@ export async function startServer(customPort?: number) {
         const commitInfo = (await commitInfoRes.json()) as { tree: { sha: string } };
         const baseTreeSha = commitInfo.tree.sha;
 
-        // Collect project files and inject APK build files if requested
+        // Collect project files and inject offline world bundle + APK build files
         const filesMap = new Map<string, Buffer>();
         for (const file of collectProjectFiles()) {
           filesMap.set(file.relPath, file.content);
         }
+        const offlineSnapshot = worldStore.getWorldSnapshot("", "");
+        filesMap.set(
+          "public/offline_world.json",
+          Buffer.from(JSON.stringify(offlineSnapshot), "utf8"),
+        );
         if (buildApk) {
           filesMap.set(
             "capacitor.config.json",

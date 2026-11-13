@@ -182,7 +182,7 @@ function buildTallyPipMesh(color, emit = 1.2) {
 // ─── Live Gemini Flash-Lite Opponent Client (/api/minigame-move) ─────────────
 async function requestGeminiFlashLiteMove(payload, fallbackValidMoves) {
   const minBeat = new Promise((r) => setTimeout(r, 260));
-  if (typeof fetch !== "function" || typeof window === "undefined") {
+  if (typeof fetch !== "function" || typeof window === "undefined" || window.__geminIslandOffline) {
     await minBeat;
     return {
       move: fallbackValidMoves[Math.floor(fallbackValidMoves.length / 2)] ?? fallbackValidMoves[0] ?? -1,

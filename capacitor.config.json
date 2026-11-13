@@ -3,10 +3,7 @@
   "appName": "GeminIsland",
   "webDir": "dist",
   "android": {
-    "allowMixedContent": true
-  },
-  "server": {
-    "url": "https://ais-dev-t6hutj4rbwtrllvr33p3xv-645397285155.europe-west2.run.app",
-    "cleartext": true
+    "allowMixedContent": true,
+    "backgroundColor": "#84c960"
   }
 }

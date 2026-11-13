@@ -78,6 +78,166 @@ let activeJob = null;
 let jobPollInterval = null;
 let jobPollInFlight = false;
 
+const OFFLINE_CREATIONS_KEY = "geminisland_offline_creations_v1";
+
+function isNativeCapacitorApp() {
+  try {
+    if (window.Capacitor?.isNativePlatform?.()) return true;
+    if (location.protocol === "capacitor:" || location.protocol === "file:") return true;
+  } catch {
+    // ignore
+  }
+  return false;
+}
+
+let isOfflineGame = isNativeCapacitorApp();
+window.__geminIslandOffline = isOfflineGame;
+
+function loadSavedOfflineCreations() {
+  try {
+    const raw = localStorage.getItem(OFFLINE_CREATIONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveOfflineCreation(creation) {
+  try {
+    const existing = loadSavedOfflineCreations();
+    existing.push(creation);
+    localStorage.setItem(OFFLINE_CREATIONS_KEY, JSON.stringify(existing.slice(-24)));
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
+function buildOfflineCreationFromPrompt(promptText, spotX, spotZ) {
+  const cleanName = (promptText || "Island Sculpture").trim().slice(0, 42) || "Island Sculpture";
+  const lower = cleanName.toLowerCase();
+  const id = `offline-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const x = typeof spotX === "number" && Number.isFinite(spotX) ? Math.round(spotX * 10) / 10 : Math.round((Math.random() * 24 - 12) * 10) / 10;
+  const z = typeof spotZ === "number" && Number.isFinite(spotZ) ? Math.round(spotZ * 10) / 10 : Math.round((Math.random() * 24 - 12) * 10) / 10;
+
+  let blueprint;
+  if (/house|home|cabin|cottage|villa|خانه|کلبه|ویلا/.test(lower)) {
+    blueprint = {
+      version: 1,
+      name: cleanName,
+      description: `Offline voxel ${cleanName}`,
+      category: "building",
+      scaleClass: "medium",
+      palette: {
+        stone: "#d6cec0",
+        wall: "#f5ede0",
+        wood: "#8f5e36",
+        roof: "#c95b42",
+        glass: "#b8e6f5",
+        glow: "#ffe29a",
+        leaf: "#58ad52",
+      },
+      ops: [
+        { op: "box", x0: -6, y0: 0, z0: -6, x1: 6, y1: 1, z1: 6, color: "stone" },
+        { op: "box", x0: -5, y0: 1, z0: -5, x1: 5, y1: 8, z1: 5, color: "wall" },
+        { op: "box", x0: -1, y0: 1, z0: 5, x1: 1, y1: 5, z1: 5, color: "wood" },
+        { op: "box", x0: -4, y0: 4, z0: 5, x1: -2, y1: 6, z1: 5, color: "glow", emit: 1.1 },
+        { op: "box", x0: 2, y0: 4, z0: 5, x1: 4, y1: 6, z1: 5, color: "glow", emit: 1.1 },
+        { op: "box", x0: -6, y0: 8, z0: -6, x1: 6, y1: 9, z1: 6, color: "roof" },
+        { op: "box", x0: -4, y0: 9, z0: -4, x1: 4, y1: 11, z1: 4, color: "roof" },
+        { op: "box", x0: -2, y0: 11, z0: -2, x1: 2, y1: 12, z1: 2, color: "roof" },
+      ],
+      parts: [],
+    };
+  } else if (/tower|castle|lighthouse|برج|قلعه|فانوس/.test(lower)) {
+    blueprint = {
+      version: 1,
+      name: cleanName,
+      description: `Offline voxel ${cleanName}`,
+      category: "landmark",
+      scaleClass: "medium",
+      palette: {
+        stone: "#dcd4c6",
+        trim: "#c95b42",
+        dark: "#3b4048",
+        glow: "#ffe49e",
+      },
+      ops: [
+        { op: "cylinder", axis: "y", y0: 0, y1: 2, cx: 0, cz: 0, radius: 5, color: "dark" },
+        { op: "cylinder", axis: "y", y0: 2, y1: 9, cx: 0, cz: 0, radius: 4, color: "stone" },
+        { op: "cylinder", axis: "y", y0: 9, y1: 15, cx: 0, cz: 0, radius: 3, color: "trim" },
+        { op: "box", x0: -2, y0: 15, z0: -2, x1: 2, y1: 18, z1: 2, color: "glow", emit: 1.6 },
+        { op: "box", x0: -3, y0: 18, z0: -3, x1: 3, y1: 19, z1: 3, color: "dark" },
+      ],
+      parts: [],
+    };
+  } else if (/tree|forest|garden|flower|درخت|باغ|گل/.test(lower)) {
+    blueprint = {
+      version: 1,
+      name: cleanName,
+      description: `Offline voxel ${cleanName}`,
+      category: "nature",
+      scaleClass: "medium",
+      palette: {
+        trunk: "#855836",
+        leaf: "#58ad52",
+        leafLight: "#78c86c",
+        blossom: "#f28db2",
+      },
+      ops: [
+        { op: "cylinder", axis: "y", y0: 0, y1: 7, cx: 0, cz: 0, radius: 1.5, color: "trunk" },
+        { op: "sphere", cx: 0, cy: 10, cz: 0, radius: 5, color: "leaf" },
+        { op: "sphere", cx: -2, cy: 11, cz: 2, radius: 3, color: "leafLight" },
+        { op: "box", x0: -1, y0: 12, z0: 3, x1: 0, y1: 13, z1: 4, color: "blossom" },
+      ],
+      parts: [],
+    };
+  } else {
+    blueprint = {
+      version: 1,
+      name: cleanName,
+      description: `Offline voxel ${cleanName}`,
+      category: "landmark",
+      scaleClass: "medium",
+      palette: {
+        marble: "#f4f1ea",
+        gold: "#f4c44e",
+        teal: "#47b0a3",
+        crystal: "#64f5df",
+      },
+      ops: [
+        { op: "box", x0: -5, y0: 0, z0: -5, x1: 5, y1: 1, z1: 5, color: "marble" },
+        { op: "box", x0: -3, y0: 1, z0: -3, x1: 3, y1: 4, z1: 3, color: "teal" },
+        { op: "box", x0: -1, y0: 4, z0: -1, x1: 1, y1: 7, z1: 1, color: "gold" },
+      ],
+      parts: [
+        {
+          name: "spin-crystal",
+          kind: "rotor",
+          speed: 1.1,
+          pivot: [0, 10, 0],
+          ops: [
+            { op: "box", x0: -2, y0: -2, z0: -2, x1: 2, y1: 2, z1: 2, color: "crystal", emit: 1.4 },
+          ],
+        },
+      ],
+    };
+  }
+
+  return {
+    id,
+    name: cleanName,
+    description: blueprint.description,
+    category: blueprint.category,
+    scaleClass: blueprint.scaleClass,
+    x,
+    z,
+    yaw: 0,
+    createdAt: Date.now(),
+    blueprint,
+  };
+}
+
 const VISITOR_STORAGE_KEY = "geminisland_visitor_token_v1";
 let cachedVisitorToken = (() => {
   try {
@@ -267,7 +427,7 @@ function triggerCameraButtonClickFX(mode) {
 const lastIncidentSentByVehicle = new Map();
 
 async function reportTrafficIncidentToObserver(incident) {
-  if (isOgCapture || !incident || typeof incident.vehicleId !== "string") return;
+  if (isOgCapture || isOfflineGame || !incident || typeof incident.vehicleId !== "string") return;
   const nowMs = Date.now();
   const prevMs = lastIncidentSentByVehicle.get(incident.vehicleId) || 0;
   if (nowMs - prevMs < 25_000) return;
@@ -775,13 +935,16 @@ worldCanvas.addEventListener("pointerleave", () => {
 readyGotoBtn.addEventListener("click", () => {
   if (!myCreationId) return;
   hoverCard.hidden = true;
-  uiState = "placed";
+  uiState = isOfflineGame ? "idle" : "placed";
   syncDockUI();
   engine.focusCreationById(myCreationId);
   const mine = worldData?.creations?.find((c) => c.id === myCreationId) || readyCreation;
   if (mine) {
     const desc = mine.description || mine.behavior?.statusLine || "";
     showToast(desc ? `${mine.name} — ${desc}` : mine.name, 4600);
+  }
+  if (isOfflineGame) {
+    myCreationId = null;
   }
 });
 
@@ -918,6 +1081,29 @@ sculptBtn.addEventListener("click", async () => {
   }
   syncDockUI();
 
+  const finishOfflineBuild = () => {
+    const offlineCreation = buildOfflineCreationFromPrompt(prompt, spotX, spotZ);
+    if (!worldData) {
+      worldData = { version: 1, creations: [], paths: [], villagers: [], terrainZones: [], props: [] };
+    }
+    if (!Array.isArray(worldData.creations)) worldData.creations = [];
+    worldData.creations.push(offlineCreation);
+    saveOfflineCreation(offlineCreation);
+    myCreationId = offlineCreation.id;
+    readyCreation = offlineCreation;
+    chosenSpot = null;
+    sculptBtn.disabled = false;
+    engine.applyWorldSnapshot(worldData);
+    uiState = "ready";
+    syncDockUI();
+    showToast(`"${offlineCreation.name}" ساخته شد و روی جزیره قرار گرفت!`, 4200);
+  };
+
+  if (isOfflineGame) {
+    setTimeout(finishOfflineBuild, 280);
+    return;
+  }
+
   try {
     const res = await fetch("/api/build", {
       method: "POST",
@@ -964,10 +1150,8 @@ sculptBtn.addEventListener("click", async () => {
     uiState = "ready";
     syncDockUI();
   } catch {
-    sculptBtn.disabled = false;
-    uiState = "composing";
-    syncDockUI();
-    showFormError("Network hiccup while building — try again.");
+    // Graceful offline build fallback if network/API is unreachable
+    finishOfflineBuild();
   }
 });
 
@@ -979,6 +1163,7 @@ promptInput.addEventListener("keydown", (e) => {
 });
 
 async function refreshLiveFeeds() {
+  if (isOfflineGame) return;
   try {
     const res = await fetch("/api/feeds");
     if (!res.ok) return;
@@ -992,7 +1177,7 @@ async function refreshLiveFeeds() {
 }
 
 async function refreshDailyEligibility() {
-  if (isOgCapture || uiState === "building" || uiState === "ready") return;
+  if (isOgCapture || isOfflineGame || uiState === "building" || uiState === "ready") return;
   try {
     const res = await fetch("/api/world", {
       headers: buildVisitorHeaders(),
@@ -1074,9 +1259,9 @@ function handleWorldMessage(msg) {
   }
 }
 
-if (!isOgCapture) {
+if (!isOgCapture && !isOfflineGame) {
   mpClient = createMultiplayerClient({
-    multiplayerEnabled: !isOgCapture,
+    multiplayerEnabled: true,
     getLocalPose: () => engine?.getLocalMultiplayerPose?.(),
     getLocalProfile: () => engine?.getLocalAppearance?.(),
     getExtraHeaders: () => buildVisitorHeaders(),
@@ -1116,12 +1301,61 @@ if (!isOgCapture) {
 
 window.__geminIslandMp = mpClient;
 
+async function loadOfflineWorldBundle() {
+  isOfflineGame = true;
+  window.__geminIslandOffline = true;
+  mpClient?.dispose?.();
+  mpClient = null;
+  updateOnlinePill(0);
+  if (githubBtn && (isNativeCapacitorApp() || (location.hostname === "localhost" && !location.port))) {
+    githubBtn.hidden = true;
+  }
+
+  const candidates = ["./offline_world.json", "/offline_world.json"];
+  for (const path of candidates) {
+    try {
+      const res = await fetch(path);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.creations)) {
+          const saved = loadSavedOfflineCreations();
+          if (saved.length > 0) {
+            const seenIds = new Set(data.creations.map((c) => c.id));
+            for (const c of saved) {
+              if (c && c.id && !seenIds.has(c.id)) {
+                data.creations.push(c);
+              }
+            }
+          }
+          worldData = data;
+          myCreationId = null;
+          engine.applyWorldSnapshot(worldData);
+          if (!isOgCapture) {
+            uiState = "idle";
+            syncDockUI();
+          }
+          return true;
+        }
+      }
+    } catch {
+      // try next path
+    }
+  }
+  return false;
+}
+
 async function initWorld() {
+  if (isOfflineGame) {
+    await loadOfflineWorldBundle();
+    return;
+  }
+
   try {
     const res = await fetch("/api/world", {
       headers: buildVisitorHeaders(),
     });
-    if (res.ok) {
+    const ct = res.headers.get("content-type") || "";
+    if (res.ok && ct.includes("application/json")) {
       worldData = await res.json();
       if (worldData?.visitorToken) storeVisitorToken(worldData.visitorToken);
       myCreationId = worldData.myCreationId || myCreationId || null;
@@ -1137,16 +1371,18 @@ async function initWorld() {
           syncDockUI();
         }
       }
+      refreshLiveFeeds();
+      if (!isOgCapture) {
+        setInterval(refreshLiveFeeds, 90_000);
+        setInterval(refreshDailyEligibility, 10 * 60_000);
+      }
+      return;
     }
   } catch (err) {
-    console.error("Failed to fetch initial world:", err);
+    console.warn("Online /api/world unavailable, switching to offline world bundle:", err);
   }
 
-  refreshLiveFeeds();
-  if (!isOgCapture) {
-    setInterval(refreshLiveFeeds, 90_000);
-    setInterval(refreshDailyEligibility, 10 * 60_000);
-  }
+  await loadOfflineWorldBundle();
 }
 
 initWorld();
@@ -1283,12 +1519,13 @@ function startApkPolling({ token, owner, repoName, actionsUrl, releasesUrl }) {
   apkPollTimer = setInterval(pollOnce, 6000);
 }
 
+if (githubBtn && isNativeCapacitorApp()) {
+  githubBtn.hidden = true;
+}
+
 if (githubBtn && githubModal) {
   githubBtn.addEventListener("click", () => {
     githubModal.hidden = false;
-    if (githubServerUrlInput && !githubServerUrlInput.value && window.location.origin.startsWith("http")) {
-      githubServerUrlInput.value = window.location.origin;
-    }
     if (githubStatusMsg) {
       githubStatusMsg.hidden = true;
       githubStatusMsg.textContent = "";
